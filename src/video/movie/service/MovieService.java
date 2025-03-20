@@ -130,9 +130,14 @@ public class MovieService implements AppService {
                 int delMovieNum = inputInteger(">>> ");
 
                 if (movieNums.contains(delMovieNum)) {
-                    Movie delMovie = movieRepository.deleteMovie(delMovieNum);
-                    System.out.printf("\n### 영화번호: %d -> %s 영화의 정보를 정상 삭제하였습니다.\n"
-                            , delMovie.getSerialNumber(), delMovie.getMovieName());
+                    movieRepository.deleteMovie(delMovieNum);
+                    for (Movie movie : movies) {
+                        if (movie.getSerialNumber() == delMovieNum) {
+                            System.out.printf("\n### 영화번호: %d -> %s 영화의 정보를 정상 삭제하였습니다.\n"
+                                    , movie.getSerialNumber(), movie.getMovieName());
+                            break;
+                        }
+                    }
                 } else {
                     System.out.println("\n### 검색된 영화 번호로만 삭제가 가능합니다.");
                 }

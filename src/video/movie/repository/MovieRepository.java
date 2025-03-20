@@ -6,6 +6,7 @@ import video.movie.domain.Movie;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -67,92 +68,81 @@ public class MovieRepository {
     }
 
     public List<Movie> searchMovieList(Condition condition, String keyword) throws Exception {
+        List<Movie> searchedList = new ArrayList<>();
+
+        String sql = "SELECT * FROM movies";
         if (condition == PUB_YEAR) {
-            return searchByPubYear(keyword);
+            sql += " WHERE pub_year LIKE ?";
         } else if (condition == NATION) {
-            return searchByNation(keyword);
+            sql += " WHERE nation LIKE ?";
         } else if (condition == TITLE) {
-            return searchByTitle(keyword);
-        } else {
-            return searchAll();
+            sql += " WHERE movie_name LIKE ?";
         }
-    }
+        try(Connection conn = DBConnectionManager.getConnection();
+            PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
-    private List<Movie> searchAll() {
-        List<Movie> searchedList = new ArrayList<>();
-        for (int key : movieDatabase.keySet()) {
-            Movie movie = movieDatabase.get(key);
-            searchedList.add(movie);
-        }
-        return searchedList;
-    }
+            if (condition != ALL) {
+                // LIKE 사용 시 %, _기호를 따옴표 안에 넣어줘야 합니다.
+                // ?옆에 %를 쓰는게 아니라, ?를 채울 때 특정 단어에 %를 미리 세팅해서 채워야 합니다.
+                pstmt.setString(1, "%" + keyword + "%");
+            }
 
-    // 문자열을 숫자로 변환하는 과정에서 예외 발생 가능성이 있기 때문에 throws 추가.
-    private List<Movie> searchByPubYear(String keyword) throws NumberFormatException {
-        List<Movie> searchedList = new ArrayList<>();
-        
-        // 입력값을 String으로 받았기 때문에 int로 변환해서 비교
-        int targetYear = Integer.parseInt(keyword);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                Movie movie = createMovieFromResultSet(rs);
 
-        for (int key : movieDatabase.keySet()) {
-            Movie movie = movieDatabase.get(key);
-            if (movie.getPubYear() == targetYear) {
                 searchedList.add(movie);
             }
+
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-        return searchedList;
-    }
 
-    private List<Movie> searchByNation(String keyword) {
-        List<Movie> searchedList = new ArrayList<>();
-
-        for (int key : movieDatabase.keySet()) {
-            Movie movie = movieDatabase.get(key);
-            if (movie.getNation().equals(keyword)) {
-                searchedList.add(movie);
-            }
-        }
-        return searchedList;
-    }
-
-    private List<Movie> searchByTitle(String keyword) {
-        List<Movie> searchedList = new ArrayList<>();
-
-        for (int key : movieDatabase.keySet()) {
-            Movie movie = movieDatabase.get(key);
-            if (movie.getMovieName().equals(keyword)) {
-                searchedList.add(movie);
-            }
-        }
         return searchedList;
     }
 
 
-    public Movie deleteMovie(int delMovieNum) {
-        return movieDatabase.remove(delMovieNum);
+    public void deleteMovie(int delMovieNum) {
+        String sql = "DELETE FROM movies WHERE serial_number = ?";
+
+        try(Connection conn = DBConnectionManager.getConnection();
+            PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, delMovieNum);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
     public List<Movie> searchByRental(boolean possible) {
         List<Movie> searchedList = new ArrayList<>();
+        String sql = "SELECT * FROM movies WHERE rental = ?";
+        try(Connection conn = DBConnectionManager.getConnection();
+            PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            // 물음표 채울 때 possible이 true면 Y를, false면 N을 채우겠다.
+            pstmt.setString(1, possible ? "Y" : "N");
 
-        if (possible) { // 대여 가능한 Movie들만 거르기
-            for (int key : movieDatabase.keySet()) {
-                Movie movie = movieDatabase.get(key);
-                if (!movie.isRental()) {
-                    searchedList.add(movie);
-                }
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                Movie movie = createMovieFromResultSet(rs);
+                searchedList.add(movie);
             }
-
-        } else { // 이미 대여중인 Movie들만 거르기
-            for (int key : movieDatabase.keySet()) {
-                Movie movie = movieDatabase.get(key);
-                if (movie.isRental()) {
-                    searchedList.add(movie);
-                }
-            }
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
-
         return searchedList;
+    }
+
+    // ResultSet에서 추출한 결과를 Movie 객체로 포장해주는 헬퍼 메서드
+    private static Movie createMovieFromResultSet(ResultSet rs) throws SQLException {
+        Movie movie = new Movie(
+                rs.getString("movie_name"),
+                rs.getString("nation"),
+                rs.getInt("pub_year")
+        );
+        movie.setRental(rs.getString("rental").equals("Y"));
+        movie.setSerialNumber(rs.getInt("serial_number"));
+        return movie;
     }
 
     // 번호에 맞는 영화 객체를 단 하나만 리턴하는 메서드.

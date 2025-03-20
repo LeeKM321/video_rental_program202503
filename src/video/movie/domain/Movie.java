@@ -15,7 +15,6 @@ public class Movie {
     private User rentalUser; // 현재 대여자 정보
 
     public Movie(String movieName, String nation, int pubYear) {
-        this.serialNumber = ++movieSequence;
         this.movieName = movieName;
         this.nation = nation;
         this.pubYear = pubYear;
@@ -80,7 +79,7 @@ public class Movie {
 
     @Override
     public String toString() {
-        String rental = this.rental ? "대여중" : "대여가능";
+        String rental = this.rental ? "대여가능" : "대여중";
         return
                 "## DVD번호: " + serialNumber +
                         ", 영화명: " + movieName +

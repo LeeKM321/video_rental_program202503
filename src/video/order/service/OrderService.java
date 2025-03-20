@@ -4,11 +4,13 @@ import video.common.AppService;
 import video.movie.domain.Movie;
 import video.movie.repository.MovieRepository;
 import video.order.domain.Order;
+import video.order.repository.OrderRepository;
 import video.ui.AppUi;
 import video.user.domain.User;
 import video.user.repository.UserRepository;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -18,6 +20,7 @@ public class OrderService implements AppService {
 
     private final MovieRepository movieRepository = new MovieRepository();
     private final UserRepository userRepository = new UserRepository();
+    private final OrderRepository orderRepository = new OrderRepository();
 
     @Override
     public void start() {
@@ -86,7 +89,12 @@ public class OrderService implements AppService {
             int movieNumber = inputInteger(">>> ");
 
             if (movieNums.contains(movieNumber)) {
-                rentalProcess(movieNumber);
+                for (Movie movie : movieList) {
+                    if (movie.getSerialNumber() == movieNumber) {
+                        rentalProcess(movie);
+                        break;
+                    }
+                }
             } else {
                 System.out.println("\n### 대여가 가능한 영화 목록중에 선택해야 합니다.");
             }
@@ -95,37 +103,32 @@ public class OrderService implements AppService {
         }
     }
 
-    private void rentalProcess(int movieNumber) {
+    private void rentalProcess(Movie rentalMovie) {
 
-        Movie rentalMovie = movieRepository.searchMovie(movieNumber);
         System.out.printf("\n### [%s] DVD를 대여합니다.\n", rentalMovie.getMovieName());
         System.out.println("### 대여자의 이름을 입력하세요.");
         String name = inputString(">>> ");
 
         List<User> users = userRepository.findUserByName(name);
+        Map<Integer, User> userMap = new HashMap<>();
 
         if(users.size() > 0) {
-            List<Integer> userNums = new ArrayList<>();
             System.out.println("\n===================================== 회원 조회 결과 =====================================");
             for (User user : users) {
                 System.out.println(user);
-                userNums.add(user.getUserNumber());
+                userMap.put(user.getUserNumber(), user);
             }
             System.out.println("========================================================================================");
             System.out.println("## 대여할 회원의 회원번호를 입력하세요.");
             int userNumber = inputInteger(">>> ");
 
-            if (userNums.contains(userNumber)) {
+            if (userMap.containsKey(userNumber)) {
                 // 대여 완료 처리
-                User rentalUser = userRepository.findUserByNumber(userNumber); // 렌탈 유저 정보 획득.
-                rentalMovie.setRental(true); // 대여상태를 대여중으로 변경
-                rentalMovie.setRentalUser(rentalUser); // 영화 객체에 렌탈 유저 등록
-
-                rentalUser.setTotalPaying(rentalMovie.getCharge()); // 영화 대여 금액을 회원 총 결제금액에 누적 갱신
+                User rentalUser = userMap.get(userNumber); // 렌탈 유저 정보 획득.
 
                 // 새로운 주문 생성
                 Order newOrder = new Order(rentalUser, rentalMovie);
-                rentalUser.addOrder(newOrder); // 회원 대여 목록에 주문을 추가.
+                rentalUser = orderRepository.processRental(newOrder);
 
                 String phoneNumber = rentalUser.getPhoneNumber(); // 출력문을 위해 얻은 전화번호
 
@@ -148,19 +151,18 @@ public class OrderService implements AppService {
 
     // 대여중(대여 불가능한)인 DVD 목록 보기
     private void showRentalImpossibleList() {
-        List<Movie> movieList = movieRepository.searchByRental(false);
+        List<Map<String, Object>> movieList
+                = orderRepository.showImpossibleRentalList();
         int count = movieList.size();
 
         if (count > 0) {
             System.out.printf("\n==================================== 검색 결과 (총 %d건) ====================================\n", count);
-            for (Movie movie : movieList) {
-                User rentalUser = movie.getRentalUser();
-                String phoneNumber = rentalUser.getPhoneNumber();
+            for (Map<String, Object> map : movieList) {
+                String phoneNumber = (String) map.get("phoneNumber");
                 String lastPhoneNumber = phoneNumber.substring(phoneNumber.lastIndexOf("-") + 1);
                 System.out.printf("### 영화명: %s, 현재 대여자: %s(%s), 반납예정일: %s\n"
-                , movie.getMovieName(), rentalUser.getUserName(), lastPhoneNumber,
-                        rentalUser.getOrderList().get(movie.getSerialNumber()).getReturnDate());
-
+                , map.get("movieName"), map.get("userName"), lastPhoneNumber,
+                        map.get("returnDate"));
             }
             System.out.println("==========================================================================================");
 

@@ -7,6 +7,7 @@ import java.time.LocalDate;
 
 public class Order {
 
+    private int orderId;
     private User user;
     private Movie movie;
     private LocalDate orderDate;
@@ -21,6 +22,14 @@ public class Order {
         this.movie = movie;
         this.orderDate = LocalDate.now();
         this.returnDate = this.orderDate.plusDays(3);
+    }
+
+    public int getOrderId() {
+        return orderId;
+    }
+
+    public void setOrderId(int orderId) {
+        this.orderId = orderId;
     }
 
     public User getUser() {

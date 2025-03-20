@@ -14,6 +14,20 @@ public class ChargePolicy {
     private static final int DISCOUNT = 500;
     private static final int LIMIT_CHARGE = 2000;
 
+    public static int calculateDvdCharge(int pubYear, LocalDate orderDate) {
+        // 대여 당시의 연도
+        int orderYear = orderDate.getYear();
+        // 출시 후 경과년도 계산 (대여 연도 기준으로)
+        int movieAge = orderYear - pubYear;
+        int charge = BASE_CHARGE - (movieAge * DISCOUNT);
+
+        if(charge < LIMIT_CHARGE) {
+            charge = LIMIT_CHARGE;
+        }
+        return charge;
+    }
+
+
     // 전달된 Movie의 발행년도에 따른 가격을 계산하는 메서드
     public static int calculateDvdCharge(Movie movie) {
         // 올해 연도 정보

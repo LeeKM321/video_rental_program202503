@@ -74,7 +74,7 @@ public class OrderRepository {
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
                 Map<String, Object> map = new HashMap<>();
-                map.put("order_id", rs.getInt("order_id"));
+                map.put("orderId", rs.getInt("order_id"));
                 map.put("serialNumber", rs.getInt("serial_number"));
                 map.put("movieName", rs.getString("movie_name"));
                 map.put("orderDate", rs.getDate("order_date"));
@@ -162,26 +162,56 @@ public class OrderRepository {
             int orderId,
             int serialNumber,
             String possible) {
-        String sql = "UPDATE movies SET rental = ? WHERE serial_number = ?";
-        try(Connection conn = DBConnectionManager.getConnection();
-                PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, possible);
-            pstmt.setInt(2, serialNumber);
-            pstmt.executeUpdate();
+        Connection conn = null;
+        try {
+            conn = DBConnectionManager.getConnection();
+            conn.setAutoCommit(false);
+            // 영화 대여 가능 상태를 Y로 변경
+            updateMovieRentalStatus(conn, serialNumber, possible);
+
+            // 대여 반납 상태를 Y로 변경
+            updateReturnStatus(conn, orderId, possible);
+
+            conn.commit();
         } catch (Exception e) {
             e.printStackTrace();
+            try {
+                conn.rollback();
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+            }
+        } finally {
+            try {
+                conn.setAutoCommit(true);
+                conn.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private void updateReturnStatus(
+            Connection conn,
+            int orderId,
+            String possible) throws Exception {
+        String sql = "UPDATE orders SET return_status = ? WHERE order_id = ?";
+        try(PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, possible);
+            pstmt.setInt(2, orderId);
+            pstmt.executeUpdate();
         }
     }
 
     // 새 대여 주문 추가
     private void addOrder(Connection conn, Order order) throws Exception {
-        String sql = "INSERT INTO orders VALUES(order_seq.NEXTVAL, ?, ?, ?, ?)";
+        String sql = "INSERT INTO orders VALUES(order_seq.NEXTVAL, ?, ?, ?, ?, ?)";
 
         try(PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, order.getUser().getUserNumber());
             pstmt.setInt(2, order.getMovie().getSerialNumber());
             pstmt.setDate(3, Date.valueOf(order.getOrderDate()));
             pstmt.setDate(4, Date.valueOf(order.getReturnDate()));
+            pstmt.setString(5, "N");
 
             pstmt.executeUpdate();
 

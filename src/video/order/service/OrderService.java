@@ -224,12 +224,17 @@ public class OrderService implements AppService {
             System.out.println("======================================================================================");
             System.out.println("### 반납할 DVD의 번호를 입력하세요.");
             int returnMovieNumber = inputInteger(">>> ");
+            System.out.println("returnMovieNumber = " + returnMovieNumber);
 
             boolean flag = false;
             for (Map<String, Object> map : rentalList) {
-                if ((Integer)map.get("serialNumber") == returnMovieNumber) {
+                System.out.println("map = " + map);
+                int serialNumber = (int) map.get("serialNumber");
+                if (serialNumber == returnMovieNumber) {
+                    System.out.println("반납 처리 진행 중 ...");
                     // 반납 처리
                     int orderId = (int) map.get("orderId");
+
                     orderRepository.updateReturnProcess(orderId, returnMovieNumber, "Y");
                     // 데이터베이스에서 날짜 타입의 값을 가져올 때 Date 타입으로 가져옵니다. -> LocalDate로 따로 변환이 필요.
                     LocalDate returnDate = ((Date) map.get("returnDate")).toLocalDate();
@@ -246,7 +251,7 @@ public class OrderService implements AppService {
             }
             if (!flag) System.out.println("\n### 해당 DVD는 반납 대상이 아닙니다.");
         } else {
-            System.out.println("\n### 대여 이력이 없습니다.4");
+            System.out.println("\n### 대여 이력이 없습니다.");
         }
 
 

@@ -82,8 +82,6 @@ public class Order {
 
     @Override
     public String toString() {
-        this.overdueDay = OverduePolicy.calculateOverdueDay(this);
-        this.overdueCharge = OverduePolicy.calculateOverdueCharge(this);
         return
                 "## 대여영화번호: " + movie.getSerialNumber() +
                         ", 대여영화명: " + movie.getMovieName() +

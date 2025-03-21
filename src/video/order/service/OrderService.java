@@ -4,15 +4,15 @@ import video.common.AppService;
 import video.movie.domain.Movie;
 import video.movie.repository.MovieRepository;
 import video.order.domain.Order;
+import video.order.domain.OverduePolicy;
 import video.order.repository.OrderRepository;
 import video.ui.AppUi;
 import video.user.domain.User;
 import video.user.repository.UserRepository;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.sql.Date;
+import java.time.LocalDate;
+import java.util.*;
 
 import static video.ui.AppUi.*;
 
@@ -180,21 +180,21 @@ public class OrderService implements AppService {
 
         List<User> users = userRepository.findUserByName(name);
         int count = users.size();
+        Map<Integer, User> userMap = new HashMap<>();
 
         if (count > 0) {
-            List<Integer> userNums = new ArrayList<>();
             System.out.printf("\n===================================== 조회 결과(총 %d건) =====================================\n", count);
             for (User user : users) {
                 System.out.println(user);
-                userNums.add(user.getUserNumber());
+                userMap.put(user.getUserNumber(), user);
             }
             System.out.println("========================================================================================");
 
             System.out.println("### 반납자의 회원 번호를 입력하세요.");
             int userNumber = inputInteger(">>> ");
 
-            if (userNums.contains(userNumber)) {
-                returnProcess(userNumber);
+            if (userMap.containsKey(userNumber)) {
+                returnProcess(userMap.get(userNumber));
             } else {
                 System.out.println("\n### 조회된 회원 번호를 입력하셔야 합니다.");
             }
@@ -203,43 +203,50 @@ public class OrderService implements AppService {
         }
     }
 
-    private void returnProcess(int userNumber) {
-        // 매개값으로 전달된 회원 번호를 통해 회원 객체를 받아야 한다. o
-        // "XXX 회원님의 대여 목록입니다" 라고 하면서 orderList 내의 모든 객체를 보여주어야 한다. o
-        // 반납할 DVD의 번호를 입력받아야 한다. o
-        // 입력한 번호가 대여중인 DVD인지 검증해야 한다. (아무 번호나 입력하지 않았는지 확인) o
-        // 대여중인 DVD가 맞다면 반납처리를 본격적으로 진행한다. o
-        // 영화 객체에서 회원정보를 삭제한다. -> rentalUser 필드 값을 null로 세팅 o
-        // 영화 객체의 대여 가능 여부를 변경해야 한다. o
-        // 연체료 발생 여부를 확인하여 연체료가 존재한다면 추가로 얼마를 결제하라고 출력문을 띄워야 하고, o
-        // 연체료가 없다면 반납이 완료되었다는 출력문을 보여주어야 한다. o
-        User returnUser = userRepository.findUserByNumber(userNumber);
-        System.out.printf("\n### 현재 [%s] 회원님의 대여 목록입니다.\n", returnUser.getUserName());
-        System.out.println("======================================================================================");
-        Map<Integer, Order> orderList = returnUser.getOrderList();
-        for (int key : orderList.keySet()) {
-            System.out.println(orderList.get(key));
-        }
-        System.out.println("======================================================================================");
-        System.out.println("### 반납할 DVD의 번호를 입력하세요.");
-        int returnMovieNumber = inputInteger(">>> ");
+    private void returnProcess(User user) {
+        // "XXX 회원님의 대여 목록입니다" 라고 하면서 해당 회원의 대여 목록을 DB에서 가져와야 한다.
+        // 반납할 DVD의 번호를 입력받아야 한다.
+        // 입력한 번호가 대여중인 DVD인지 검증해야 한다. (아무 번호나 입력하지 않았는지 확인)
+        // 대여중인 DVD가 맞다면 반납처리를 본격적으로 진행한다.
+        // 영화의 대여 가능 여부를 변경해야 한다. -> DB에서 변경
+        // 연체료 발생 여부를 확인하여 연체료가 존재한다면 추가로 얼마를 결제하라고 출력문을 띄워야 하고,
+        // 연체료가 없다면 반납이 완료되었다는 출력문을 보여주어야 한다.
+        List<Map<String, Object>> rentalList
+                = orderRepository.showRentalListByUserNumber(user.getUserNumber());
 
-        if (orderList.containsKey(returnMovieNumber)) {
-            // 반납 처리
-            Movie returnMovie = movieRepository.searchMovie(returnMovieNumber);
-            returnMovie.setRentalUser(null);
-            returnMovie.setRental(false);
-
-            Order returnOrder = orderList.get(returnMovieNumber);
-            int overdueCharge = returnOrder.getOverdueCharge();
-            if (overdueCharge > 0) {
-                System.out.printf("\n### 반납이 완료되었습니다. %d원을 추가로 결제해 주세요!\n", overdueCharge);
-            } else {
-                System.out.println("\n### 반납이 완료되었습니다. 즐거운 하루 되세요!");
+        if (!rentalList.isEmpty()) {
+            System.out.printf("\n### 현재 [%s] 회원님의 대여 목록입니다.\n", user.getUserName());
+            System.out.println("======================================================================================");
+            for (Map<String, Object> map : rentalList) {
+                System.out.printf("### %s. 영화명: %s, 대여일자: %s, 반납일자: %s\n"
+                        , map.get("serialNumber"), map.get("movieName"), map.get("orderDate"), map.get("returnDate"));
             }
+            System.out.println("======================================================================================");
+            System.out.println("### 반납할 DVD의 번호를 입력하세요.");
+            int returnMovieNumber = inputInteger(">>> ");
 
+            boolean flag = false;
+            for (Map<String, Object> map : rentalList) {
+                if ((Integer)map.get("serialNumber") == returnMovieNumber) {
+                    // 반납 처리
+                    int orderId = (int) map.get("orderId");
+                    orderRepository.updateReturnProcess(orderId, returnMovieNumber, "Y");
+                    // 데이터베이스에서 날짜 타입의 값을 가져올 때 Date 타입으로 가져옵니다. -> LocalDate로 따로 변환이 필요.
+                    LocalDate returnDate = ((Date) map.get("returnDate")).toLocalDate();
+                    int overdueCharge = OverduePolicy.calculateOverdueCharge(returnDate);
+
+                    if (overdueCharge > 0) {
+                        System.out.printf("\n### 반납이 완료되었습니다. %d원을 추가로 결제해 주세요!\n", overdueCharge);
+                    } else {
+                        System.out.println("\n### 반납이 완료되었습니다. 즐거운 하루 되세요!");
+                    }
+                    flag = true;
+                    break;
+                }
+            }
+            if (!flag) System.out.println("\n### 해당 DVD는 반납 대상이 아닙니다.");
         } else {
-            System.out.println("\n### 해당 DVD는 반납 대상이 아닙니다.");
+            System.out.println("\n### 대여 이력이 없습니다.4");
         }
 
 

@@ -59,6 +59,34 @@ public class OrderRepository {
         return order.getUser();
     }
 
+    public List<Map<String, Object>> showRentalListByUserNumber(int userNumber) {
+        List<Map<String, Object>> rentalList = new ArrayList<>();
+        String sql = "SELECT " +
+                "o.order_id, m.serial_number, m.movie_name, o.order_date, o.return_date " +
+                "FROM orders o " +
+                "JOIN movies m ON o.serial_number = m.serial_number " +
+                "WHERE o.user_number = ? " +
+                "AND o.return_status = 'N' " +
+                "ORDER BY o.order_date ASC";
+        try(Connection conn = DBConnectionManager.getConnection();
+            PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, userNumber);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                Map<String, Object> map = new HashMap<>();
+                map.put("order_id", rs.getInt("order_id"));
+                map.put("serialNumber", rs.getInt("serial_number"));
+                map.put("movieName", rs.getString("movie_name"));
+                map.put("orderDate", rs.getDate("order_date"));
+                map.put("returnDate", rs.getDate("return_date"));
+                rentalList.add(map);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return rentalList;
+    }
+
     public List<Map<String, Object>> showImpossibleRentalList() {
         String sql = "SELECT " +
                 "m.movie_name, u.user_name, u.phone_number, o.return_date " +
@@ -127,6 +155,21 @@ public class OrderRepository {
             pstmt.setString(1, possible);
             pstmt.setInt(2, serialNumber);
             pstmt.executeUpdate();
+        }
+    }
+
+    public void updateReturnProcess(
+            int orderId,
+            int serialNumber,
+            String possible) {
+        String sql = "UPDATE movies SET rental = ? WHERE serial_number = ?";
+        try(Connection conn = DBConnectionManager.getConnection();
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, possible);
+            pstmt.setInt(2, serialNumber);
+            pstmt.executeUpdate();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 

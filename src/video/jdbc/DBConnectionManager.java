@@ -10,8 +10,8 @@ public class DBConnectionManager {
     // 오라클 JDBC 연결 정보
     private static final String DRIVER = "oracle.jdbc.driver.OracleDriver";
     private static final String URL = "jdbc:oracle:thin:@localhost:1521:xe";
-    private static final String USER = "admin";
-    private static final String PASSWORD = "admin";
+    private static final String USER = "test";
+    private static final String PASSWORD = "test";
 
     // 정적 초기화자를 사용하여 드라이버 로드
     static {
